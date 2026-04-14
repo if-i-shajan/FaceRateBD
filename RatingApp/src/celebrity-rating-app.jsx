@@ -643,6 +643,7 @@ function Navbar({ user, onLogout, onBack, adminMode }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {user && <span className="hide-sm" style={{ fontSize: 13, color: "var(--muted)", fontWeight: 500 }}>{user.id}</span>}
+          {user && onLogout && <button className="btn btn-o btn-sm" onClick={onLogout}>Sign Out</button>}
           {user && (
             <a href="https://github.com/if-i-shajan" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
               <div style={{
@@ -678,7 +679,6 @@ function Navbar({ user, onLogout, onBack, adminMode }) {
               </div>
             </a>
           )}
-          {user && onLogout && <button className="btn btn-o btn-sm" onClick={onLogout}>Sign Out</button>}
         </div>
       </div>
     </nav>

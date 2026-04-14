@@ -1,18 +1,16 @@
-# README
+# FaceRate BD — Bangladeshi Celebrity Rating System
 
-## FaceRate BD - Bangladeshi Celebrity Rating System
-
-A full-stack React + Supabase image rating platform for collecting student ratings on Bangladeshi celebrity photos, with separate user and admin flows, progress tracking, cooldown logic, analytics, CSV export, and an optional OTP email service.
+A full-stack React + Supabase web application for collecting ratings on Bangladeshi celebrity photos, with user and admin flows, resumable rating sessions, cooldown logic, analytics, CSV export, and optional OTP email verification.
 
 ## Tech Stack
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | React 19 + Vite 8 |
-| Backend | Node.js + Express (OTP email service) |
+| Frontend | React 19, Vite 8 |
+| Backend | Node.js, Express |
 | Database | Supabase PostgreSQL |
 | Auth | Session storage + Supabase `users` table |
-| Email | Resend API |
+| Email/OTP | Resend API |
 | Styling | Custom React styling + Google Fonts |
 | Hosting | Firebase Hosting (frontend), Vercel-ready backend |
 
@@ -20,55 +18,47 @@ A full-stack React + Supabase image rating platform for collecting student ratin
 
 ```text
 CelebrityRatingApp/
-├── README.md
-├── QUICK_START.md
-├── RESEND_OTP_INTEGRATION.md
+├── README.md                           # Main project documentation
+├── QUICK_START.md                      # OTP setup quick guide
+├── RESEND_OTP_INTEGRATION.md           # OTP integration walkthrough
 ├── package.json
-├── package-lock.json
 ├── RatingApp/
-│   ├── .firebaserc
-│   ├── firebase.json
+│   ├── firebase.json                   # Firebase hosting config
+│   ├── package.json                    # Frontend dependencies
 │   ├── index.html
-│   ├── package.json
-│   ├── vite.config.js
 │   ├── public/
-│   │   ├── favicon.svg
 │   │   ├── icons.svg
 │   │   └── index.html
 │   ├── src/
-│   │   ├── main.jsx
-│   │   ├── celebrity-rating-app.jsx
-│   │   ├── celebrity-rating-app-backup.jsx
-│   │   ├── supabaseClient.js
-│   │   ├── resendOTPService.js
+│   │   ├── main.jsx                    # React entry point
 │   │   ├── App.jsx
+│   │   ├── celebrity-rating-app.jsx    # Main app UI and logic
+│   │   ├── celebrity-rating-app-backup.jsx
+│   │   ├── supabaseClient.js           # Supabase client setup
+│   │   ├── resendOTPService.js         # Frontend OTP API client
 │   │   ├── App.css
-│   │   ├── index.css
-│   │   └── assets/
-│   │       ├── hero.png
-│   │       ├── react.svg
-│   │       └── vite.svg
+│   │   └── index.css
 │   └── supabase/
-│       └── rls_policies.sql
+│       └── rls_policies.sql            # Supabase RLS and helper SQL
 ├── backend/
-│   ├── .env.example
-│   ├── README.md
-│   ├── package.json
-│   ├── server.js
-│   └── vercel.json
+│   ├── server.js                       # OTP email API
+│   ├── package.json                    # Backend dependencies
+│   ├── .env.example                    # Backend env template
+│   ├── vercel.json                     # Vercel deployment config
+│   └── README.md
 └── dataconnect/
     ├── dataconnect.yaml
     ├── migrations/
-    │   └── 001_create_otp_table.sql
+    │   └── 001_create_otp_table.sql    # OTP table migration
     └── schema/
         └── schema.gql
 ```
 
 ## Setup Instructions
 
-### Step 1 - Install Dependencies
+### Step 1 — Install Dependencies
 
-Install the frontend and backend separately:
+Install frontend and backend dependencies separately:
 
 ```bash
 cd RatingApp
@@ -78,31 +68,30 @@ cd ../backend
 npm install
 ```
 
-### Step 2 - Create the Supabase Project
+### Step 2 — Create the Supabase Database
 
-Create a Supabase project, then create the required tables listed in the Database Schema section below.
+Create a Supabase project and create the tables used by the app:
 
-After the tables exist, run:
+- `users`
+- `photos`
+- `ratings`
+- `user_progress`
+- `otp_codes` (optional, only if using OTP email verification)
+
+Then run:
 
 - `RatingApp/supabase/rls_policies.sql`
-- `dataconnect/migrations/001_create_otp_table.sql` if you want OTP email verification
+- `dataconnect/migrations/001_create_otp_table.sql` if you want OTP support
 
-### Step 3 - Configure Frontend Supabase Access
+### Step 3 — Configure Frontend Supabase Access
 
-The current frontend reads Supabase from:
+The frontend Supabase client lives in `RatingApp/src/supabaseClient.js`.
 
-`RatingApp/src/supabaseClient.js`
+If you want to use a different Supabase project, update that file with your own project URL and anon key.
 
-Update this file if you want to point the app at a different Supabase project:
+### Step 4 — Configure the Optional OTP Backend
 
-```js
-const SUPABASE_URL = 'your_supabase_project_url';
-const SUPABASE_ANON_KEY = 'your_supabase_anon_key';
-```
-
-### Step 4 - Configure Optional OTP Backend
-
-Create `backend/.env` from `backend/.env.example`:
+Create `backend/.env` from `backend/.env.example` and set:
 
 ```env
 RESEND_API_KEY=your_resend_api_key
@@ -111,7 +100,7 @@ SUPABASE_SERVICE_KEY=your_supabase_service_role_key
 PORT=3001
 ```
 
-### Step 5 - Run the App Locally
+### Step 5 — Run the App
 
 Frontend:
 
@@ -120,7 +109,7 @@ cd RatingApp
 npm run dev
 ```
 
-Backend OTP service:
+Backend OTP API:
 
 ```bash
 cd backend
@@ -132,14 +121,14 @@ Open:
 - Frontend: `http://localhost:5173`
 - OTP API: `http://localhost:3001`
 
-### Step 6 - Build and Deploy
+### Step 6 — Deploy the App
 
 Frontend:
 
 ```bash
 cd RatingApp
 npm run build
-firebase deploy --only hosting
+firebase deploy
 ```
 
 Backend:
@@ -149,43 +138,34 @@ cd backend
 vercel
 ```
 
-Current frontend deployment:
-
-- `https://facerate-bd.web.app`
+Current frontend deployment: `https://facerate-bd.web.app`
 
 ## Accounts & Roles
 
 ### Creating a User Account
 
-To create a regular rater account:
+To create a user account:
 
-1. Open the main app
-2. Click `Create Account`
-3. Enter student ID, full name, email, gender, password, and confirmation
-4. Submit the form
+1. Open the app.
+2. Click `Create Account`.
+3. Enter student ID, full name, email, gender, password, and confirm password.
+4. Submit the form.
 
 Current validation rules:
 
-- Student ID must match `232-15-001` style formatting
-- Email must include `@`
-- Password must be at least 6 characters
+- Student ID must match `232-15-001` format.
+- Email must contain `@`.
+- Password must be at least 6 characters.
 
 ### Accessing the Admin Panel
 
-To access the admin dashboard:
+To access the admin panel:
 
-1. Open the login page
-2. Click `Admin Access`
-3. Enter the admin password
+1. Open the login page.
+2. Click `Admin Access`.
+3. Enter the admin password.
 
-Current admin password in code:
-
-- `adminbaby`
-
-Note:
-
-- Admin access is currently a separate password gate in the frontend
-- It is not tied to a Supabase admin user row yet
+Current admin password in code: `adminbaby`
 
 ## Database Schema
 
@@ -196,18 +176,18 @@ Note:
 | id | TEXT PK | Student ID, e.g. `232-15-001` |
 | name | TEXT | User full name |
 | email | TEXT | User email |
-| gender | TEXT | `Male` or `Female` in current UI |
-| password | TEXT | Stored directly in current implementation |
+| gender | TEXT | Current UI stores values like `Male` / `Female` |
+| password | TEXT | Stored directly in the current implementation |
 | created_at | TIMESTAMP | Account creation time |
 
 ### photos
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| id | TEXT PK | Generated photo identifier |
+| id | TEXT PK | Photo identifier |
 | celebrity | TEXT | Celebrity display name |
-| gender | TEXT | Currently saved as `unspecified` by admin upload flow |
-| url | TEXT | Direct image URL |
+| gender | TEXT | Photo gender/category |
+| url | TEXT | Image URL |
 | created_at | TIMESTAMP | Upload time |
 
 ### ratings
@@ -217,47 +197,47 @@ Note:
 | id | TEXT PK | Generated with `crypto.randomUUID()` |
 | photo_id | TEXT FK | References `photos.id` |
 | user_id | TEXT FK | References `users.id` |
-| rating | INTEGER | Must be between 1 and 10 |
+| rating | INTEGER | Rating from 1 to 10 |
 | comment | TEXT | Currently stored as `null` |
 | created_at | TIMESTAMP | Rating timestamp |
-| - | UNIQUE(photo_id, user_id) | One rating per user per photo |
+| — | UNIQUE(photo_id, user_id) | One rating per user per photo |
 
 ### user_progress
 
 | Column | Type | Notes |
 | --- | --- | --- |
 | user_id | TEXT PK FK | References `users.id` |
-| rated_ids | JSON / TEXT | List of rated photo IDs |
+| rated_ids | JSON / TEXT | IDs already rated by the user |
 | session_queue | JSON / TEXT | Saved randomized queue |
-| session_idx | INTEGER | Resume position in queue |
-| updated_at | TIMESTAMP | Last progress update |
+| session_idx | INTEGER | Resume position in the queue |
+| updated_at | TIMESTAMP | Last update timestamp |
 
 ### otp_codes
 
 | Column | Type | Notes |
 | --- | --- | --- |
 | id | BIGSERIAL PK | Auto-generated |
-| email | TEXT | OTP target email |
-| otp | TEXT | 6-digit code |
+| email | TEXT | OTP recipient |
+| otp | TEXT | 6-digit verification code |
 | used | BOOLEAN | Marks verified codes |
-| expires_at | TIMESTAMP | 10-minute validity |
-| created_at | TIMESTAMP | OTP creation time |
+| expires_at | TIMESTAMP | Expiration timestamp |
+| created_at | TIMESTAMP | Creation timestamp |
 
 ## Business Rules
 
 | Rule | Implementation |
 | --- | --- |
-| Student ID must follow `232-15-001` format | Frontend signup validation |
-| Password must be at least 6 characters | Frontend signup validation |
-| Ratings must be between 1 and 10 | Frontend validation before insert |
-| One rating per user per image | Duplicate insert updates existing row |
-| Unrated images are shown in random order | `strongShuffle()` on available photos |
-| Progress survives refresh/re-login | `user_progress` table |
-| Queue resumes where the user left off | `session_queue` + `session_idx` |
-| Short break every 20 ratings | `COOL_AT = 20` |
-| Cooldown length is 15 seconds | `COOL_SECS = 15` |
-| Admin can add and delete photos | Admin panel photo tools |
-| Admin can export ratings as CSV | Admin export tab |
+| Student ID must follow `232-15-001` format | Signup validation in frontend |
+| Password must be at least 6 characters | Signup validation in frontend |
+| Rating must be 1–10 | Client-side validation before save |
+| One rating per user per photo | Duplicate insert falls back to update |
+| Unrated images are shown in shuffled order | `strongShuffle()` on remaining photos |
+| Progress survives refresh and re-login | `user_progress` table |
+| Rating queue resumes where the user stopped | `session_queue` + `session_idx` |
+| Cooldown starts every 20 ratings | `COOL_AT = 20` |
+| Cooldown duration is 15 seconds | `COOL_SECS = 15` |
+| Admin can add and delete photos | Admin tools in frontend |
+| Admin can export ratings as CSV | Admin analytics/export section |
 
 ## OTP API Endpoints
 
@@ -314,48 +294,49 @@ GET /api/health
 - [x] Separate admin access page
 - [x] Random unrated image queue
 - [x] Rating scale from 1 to 10
-- [x] Duplicate rating protection via upsert-style logic
-- [x] Saved session queue and progress recovery
-- [x] Cooldown break after every 20 ratings
+- [x] Duplicate rating protection
+- [x] Session queue and progress recovery
+- [x] Cooldown after every 20 ratings
 - [x] User dashboard with progress overview
-- [x] My Ratings page with personal history
-- [x] Admin photo upload by direct URL
+- [x] Personal ratings/history page
+- [x] Admin photo upload by URL
 - [x] Admin photo deletion
 - [x] Admin user list
 - [x] Admin analytics dashboard
 - [x] Gender comparison analytics
 - [x] Ratings CSV export
 - [x] Terms and Conditions page
-- [x] Optional Resend OTP backend service
-- [x] Firebase Hosting frontend deployment
+- [x] Optional Resend OTP backend
+- [x] Firebase Hosting deployment
 - [x] Vercel-ready backend configuration
 
 ## Security Notes
 
-This project currently works well as an academic/prototype system, but there are important security limitations to know before production use:
+This project works well as an academic/prototype system, but there are important production limitations:
 
-- User passwords are currently stored directly in the `users` table
-- Admin access uses a hardcoded frontend password (`adminbaby`)
-- The frontend contains the Supabase URL and anon key in source code
-- Most access control is enforced in the frontend and via permissive RLS policies
-- The OTP backend correctly keeps the Resend API key on the server side
+- User passwords are currently stored directly in the `users` table.
+- Admin access uses a hardcoded frontend password (`adminbaby`).
+- Frontend configuration currently includes Supabase connection details in source.
+- Most authorization is handled in the frontend and through Supabase policy configuration.
+- The OTP backend keeps the Resend API key on the server side, which is the safer part of the current design.
 
 Recommended production improvements:
 
-1. Move authentication to Supabase Auth or a secure backend
-2. Hash passwords before storing them
-3. Replace the hardcoded admin password with role-based backend authorization
-4. Tighten RLS policies to user-specific access instead of public access
-5. Move all sensitive configuration to environment variables
+1. Move authentication to Supabase Auth or a secure backend.
+2. Hash passwords before storing them.
+3. Replace the hardcoded admin password with role-based authorization.
+4. Tighten RLS policies for user-specific access.
+5. Move sensitive configuration fully into environment variables.
 
-## Notes for Contributors
+## Live Demo
 
-- Main frontend logic lives in `RatingApp/src/celebrity-rating-app.jsx`
-- Supabase access is centralized in `RatingApp/src/supabaseClient.js`
-- OTP email logic lives in `backend/server.js`
-- Rating-related RLS helpers are in `RatingApp/supabase/rls_policies.sql`
-- OTP table migration lives in `dataconnect/migrations/001_create_otp_table.sql`
+- Frontend: `https://facerate-bd.web.app`
+- GitHub repository: `https://github.com/if-i-shajan/FaceRateBD.git`
 
-## License / Usage
+## Notes
 
-This project appears to be intended for course or research use. If you plan to publish or reuse it publicly, review the image sources, authentication flow, and security model before production deployment.
+- Main frontend logic lives in `RatingApp/src/celebrity-rating-app.jsx`.
+- Supabase access is configured in `RatingApp/src/supabaseClient.js`.
+- OTP email logic lives in `backend/server.js`.
+- Rating-related Supabase SQL is in `RatingApp/supabase/rls_policies.sql`.
+- OTP migration SQL is in `dataconnect/migrations/001_create_otp_table.sql`.
