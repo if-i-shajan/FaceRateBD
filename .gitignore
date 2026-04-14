@@ -1,0 +1,16 @@
+node_modules/
+backend/node_modules/
+.vite/
+.firebase/
+RatingApp/.firebase/
+
+dist/
+dist-fixed/
+backend/dist/
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db

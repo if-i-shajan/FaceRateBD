@@ -1,0 +1,32 @@
+type User @table {
+  username: String!
+  email: String!
+  passwordHash: String!
+  createdAt: Timestamp!
+  displayName: String
+  bio: String
+  profilePictureUrl: String
+}
+
+type Trait @table {
+  name: String!
+  createdAt: Timestamp!
+  description: String
+}
+
+type Rating @table {
+  rater: User!
+  ratee: User!
+  trait: Trait!
+  score: Int!
+  createdAt: Timestamp!
+  comment: String
+}
+
+type Friendship @table(key: ["user1", "user2"]) {
+  user1: User!
+  user2: User!
+  status: String!
+  createdAt: Timestamp!
+  acceptedAt: Timestamp
+}
