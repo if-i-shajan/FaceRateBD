@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, memo } from "react";
 import { supabase } from "./supabaseClient";
 
 function humanizeSupabaseError(err) {
@@ -36,7 +36,12 @@ const DB = {
   async upsertUser(user) {
     const { error } = await supabase.from("users").upsert([user], { onConflict: "id" });
     if (error) console.error("Upsert user error:", error);
-    return !error;
+    return { ok: !error, error };
+  },
+  async updateUserProfilePhoto(userId, photoDataUrl) {
+    const { error } = await supabase.from("users").update({ profile_photo_url: photoDataUrl }).eq("id", userId);
+    if (error) console.error("Update photo error:", error);
+    return { ok: !error, error };
   },
   async getAllUsers() {
     const { data, error } = await supabase.from("users").select("*");
@@ -264,12 +269,12 @@ function SignupPage({ onBack, onSignupSuccess }) {
 
     const success = await DB.upsertUser(newUser);
 
-    if (success) {
+    if (success.ok) {
       sessionStorage.setItem("user", JSON.stringify(newUser));
       setLoading(false);
       onSignupSuccess(newUser);
     } else {
-      setErr("Failed to create account. Please try again.");
+      setErr(`Failed to create account: ${success.error?.message || "Please try again."}`);
       setLoading(false);
     }
   };
@@ -278,7 +283,7 @@ function SignupPage({ onBack, onSignupSuccess }) {
     <div className="auth-page" style={{ background: "var(--bg)" }}>
       <div className="auth-box fade">
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 14, marginBottom: 16 }}>← Back to login</button>
+          <button onClick={onBack} style={{ background: "linear-gradient(135deg, var(--m100), rgba(42,184,139,0.05))", border: "1px solid var(--m200)", color: "var(--m600)", cursor: "pointer", fontSize: 14, marginBottom: 16, padding: "8px 16px", borderRadius: 8, fontWeight: 600, transition: "all 0.3s ease", display: "inline-block" }} onMouseEnter={(e) => { e.currentTarget.style.background = "var(--m100)"; e.currentTarget.style.borderColor = "var(--m400)"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "linear-gradient(135deg, var(--m100), rgba(42,184,139,0.05))"; e.currentTarget.style.borderColor = "var(--m200)"; }}>← Back to login</button>
           <div style={{ width: 60, height: 60, background: "linear-gradient(135deg,var(--m400),var(--m300))", borderRadius: 18, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontSize: 26, boxShadow: "0 6px 20px rgba(42,184,139,0.3)" }}>🎭</div>
           <h1 style={{ fontFamily: "'DM Serif Display',serif", fontSize: 28, color: "var(--text)" }}>Create Account</h1>
           <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 6 }}>Join FaceRate BD today</p>
@@ -615,9 +620,10 @@ export default function App() {
       {page === "signup" && <SignupPage onBack={() => go("login")} onSignupSuccess={handleSignupSuccess} />}
       {page === "terms" && <TermsAndConditionsPage onBack={() => go("login")} />}
       {page === "admin-login" && <AdminLoginPage onBack={() => go("login")} onOk={() => go("admin")} />}
-      {page === "dashboard" && <DashboardPage user={user} onLogout={doLogout} onRate={() => go("rating")} onResults={() => go("my-ratings")} />}
+      {page === "dashboard" && <DashboardPage user={user} onLogout={doLogout} onRate={() => go("rating")} onResults={() => go("my-ratings")} onProfile={() => go("user-profile")} />}
       {page === "rating" && <RatingPage user={user} onDone={() => go("dashboard")} />}
       {page === "my-ratings" && <MyRatingsPage user={user} onBack={() => go("dashboard")} />}
+      {page === "user-profile" && <UserProfilePage user={user} onBack={() => go("dashboard")} onUpdateUser={(updatedUser) => { setUser(updatedUser); sessionStorage.setItem("user", JSON.stringify(updatedUser)); }} />}
       {page === "admin" && <AdminPage onBack={() => go("login")} />}
     </div>
   );
@@ -642,7 +648,29 @@ function Navbar({ user, onLogout, onBack, adminMode }) {
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {user && <span className="hide-sm" style={{ fontSize: 13, color: "var(--muted)", fontWeight: 500 }}>{user.id}</span>}
+          {user && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                background: "var(--m100)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 18,
+                overflow: "hidden",
+                border: "2px solid var(--m300)"
+              }}>
+                {user.profile_photo_url ? (
+                  <img src={user.profile_photo_url} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  user.gender?.toLowerCase() === "male" ? "👨" : "👩"
+                )}
+              </div>
+              <span className="hide-sm" style={{ fontSize: 13, color: "var(--muted)", fontWeight: 500 }}>{user.id}</span>
+            </div>
+          )}
           {user && onLogout && <button className="btn btn-o btn-sm" onClick={onLogout}>Sign Out</button>}
           {user && (
             <a href="https://github.com/if-i-shajan" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
@@ -758,7 +786,7 @@ function AdminLoginPage({ onBack, onOk }) {
     <div className="auth-page" style={{ background: "var(--bg)" }}>
       <div className="auth-box fade">
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 14, marginBottom: 16 }}>← Back</button>
+          <button onClick={onBack} style={{ background: "linear-gradient(135deg, var(--m100), rgba(42,184,139,0.05))", border: "1px solid var(--m200)", color: "var(--m600)", cursor: "pointer", fontSize: 14, marginBottom: 16, padding: "8px 16px", borderRadius: 8, fontWeight: 600, transition: "all 0.3s ease", display: "inline-block" }} onMouseEnter={(e) => { e.currentTarget.style.background = "var(--m100)"; e.currentTarget.style.borderColor = "var(--m400)"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "linear-gradient(135deg, var(--m100), rgba(42,184,139,0.05))"; e.currentTarget.style.borderColor = "var(--m200)"; }}>← Back</button>
           <div style={{ width: 60, height: 60, background: "linear-gradient(135deg,var(--m500),var(--m400))", borderRadius: 18, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontSize: 26, boxShadow: "0 10px 22px rgba(53,153,113,0.22)" }}>🔒</div>
           <h1 style={{ fontFamily: "'DM Serif Display',serif", fontSize: 28, color: "var(--text)" }}>Admin Access</h1>
           <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 6 }}>Restricted to authorized users</p>
@@ -780,17 +808,31 @@ function AdminLoginPage({ onBack, onOk }) {
 }
 
 /* ═══════════════════════════ DASHBOARD ═══════════════════════════════════════ */
-function DashboardPage({ user, onLogout, onRate, onResults }) {
-  const [stats, setStats] = useState({ total: 0, rated: 0, remaining: 0 });
+function DashboardPage({ user, onLogout, onRate, onResults, onProfile }) {
+  const [stats, setStats] = useState({ total: 0, rated: 0, remaining: 0, avgRating: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       const photos = await DB.getPhotos();
       const progress = await DB.getProgress(user.id);
+      const ratings = await DB.getRatings();
+
       const total = Object.keys(photos).length;
       const rated = progress.ratedIds.length;
-      setStats({ total, rated, remaining: total - rated });
+
+      // Calculate average rating for this user
+      let totalRating = 0;
+      let ratingCount = 0;
+      Object.values(ratings).forEach(photoRatings => {
+        if (photoRatings[user.id]) {
+          totalRating += photoRatings[user.id].rating;
+          ratingCount++;
+        }
+      });
+      const avgRating = ratingCount > 0 ? (totalRating / ratingCount).toFixed(2) : 0;
+
+      setStats({ total, rated, remaining: Math.max(0, total - rated), avgRating });
       setLoading(false);
     })();
   }, [user]);
@@ -811,7 +853,7 @@ function DashboardPage({ user, onLogout, onRate, onResults }) {
             Hello, <span style={{ color: "var(--m500)" }}>{user.name || user.id}</span> 👋
           </h1>
           <p style={{ color: "var(--mid)", marginTop: 8, fontSize: 15 }}>
-            {user.gender === "male" ? "👨" : "👩"} {user.gender?.charAt(0).toUpperCase() + user.gender?.slice(1)} Student &nbsp;·&nbsp; {user.email}
+            {user.gender?.toLowerCase() === "male" ? "👨" : "👩"} {user.gender?.charAt(0).toUpperCase() + user.gender?.slice(1)} Student &nbsp;·&nbsp; {user.email}
           </p>
         </div>
 
@@ -822,11 +864,15 @@ function DashboardPage({ user, onLogout, onRate, onResults }) {
           ) : [
             { label: "Total Photos", value: stats.total, icon: "📸", color: "var(--m400)" },
             { label: "Rated by You", value: stats.rated, icon: "✅", color: "#16a34a" },
+            { label: "Average Rating", value: stats.avgRating, icon: "⭐", color: "#f59e0b" },
             { label: "Remaining", value: stats.remaining, icon: "⏳", color: "#d97706" },
           ].map(s => (
             <div key={s.label} className="card" style={{ padding: "22px 24px" }}>
               <div style={{ fontSize: 30, marginBottom: 8 }}>{s.icon}</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
+              <div style={{ fontSize: 40, fontWeight: 800, color: s.color, lineHeight: 1 }}>
+                {s.value}
+                {s.label === "Average Rating" && <span style={{ fontSize: 20, fontWeight: 400 }}>/10</span>}
+              </div>
               <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 5, fontWeight: 500 }}>{s.label}</div>
             </div>
           ))}
@@ -851,6 +897,15 @@ function DashboardPage({ user, onLogout, onRate, onResults }) {
             </p>
             <button className="btn btn-o" onClick={e => { e.stopPropagation(); onResults(); }}>View Results →</button>
           </div>
+
+          <div className="card card-hover" style={{ padding: 32, background: "#ffffff", cursor: "pointer" }} onClick={onProfile}>
+            <div style={{ fontSize: 44, marginBottom: 14 }}>👤</div>
+            <h3 style={{ fontSize: 21, fontWeight: 700, marginBottom: 8 }}>My Profile</h3>
+            <p style={{ color: "var(--mid)", fontSize: 14, lineHeight: 1.65, marginBottom: 22 }}>
+              Upload or update your profile photo to personalize your account.
+            </p>
+            <button className="btn btn-o" onClick={e => { e.stopPropagation(); onProfile(); }}>Edit Profile →</button>
+          </div>
         </div>
 
         {/* Progress bar */}
@@ -867,6 +922,155 @@ function DashboardPage({ user, onLogout, onRate, onResults }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════ USER PROFILE PAGE ═══════════════════════════════════════ */
+function UserProfilePage({ user, onBack, onUpdateUser }) {
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState(user.profile_photo_url || null);
+  const [toast, setToast] = useState(null);
+
+  const handleProfilePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setUploadingPhoto(true);
+      const reader = new FileReader();
+      reader.onerror = () => {
+        setToast({ type: 'error', message: 'Failed to read file' });
+        setUploadingPhoto(false);
+      };
+      reader.onload = async (event) => {
+        try {
+          const photoDataUrl = event.target.result;
+          const result = await DB.updateUserProfilePhoto(user.id, photoDataUrl);
+          if (result.ok) {
+            setProfilePhoto(photoDataUrl);
+            const updatedUser = { ...user, profile_photo_url: photoDataUrl };
+            onUpdateUser(updatedUser);
+            setToast({ type: 'ok', message: 'Profile photo updated successfully!' });
+            setTimeout(() => setToast(null), 3000);
+          } else {
+            const errorMsg = result.error?.message || 'Failed to save photo';
+            console.error('Photo save error details:', result.error);
+            setToast({ type: 'error', message: `Failed to save photo: ${errorMsg}` });
+          }
+        } catch (error) {
+          console.error('Photo upload error:', error);
+          setToast({ type: 'error', message: 'Failed to upload photo: ' + error.message });
+        } finally {
+          setUploadingPhoto(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Photo upload error:', error);
+      setToast({ type: 'error', message: 'Failed to upload photo' });
+      setUploadingPhoto(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
+      <Navbar user={user} onLogout={() => { }} />
+      <div className="page fade">
+        <button
+          onClick={onBack}
+          style={{
+            marginBottom: 24,
+            background: "var(--m100)",
+            border: "none",
+            color: "var(--m600)",
+            padding: "8px 16px",
+            borderRadius: 8,
+            cursor: "pointer",
+            fontWeight: 600,
+            fontSize: 14
+          }}
+        >
+          ← Back to Dashboard
+        </button>
+
+        <div className="card" style={{ padding: 40, maxWidth: 600, margin: "0 auto" }}>
+          <h1 style={{ fontSize: 32, marginBottom: 8, fontFamily: "'DM Serif Display',serif" }}>My Profile</h1>
+          <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: 32 }}>Upload or update your profile photo</p>
+
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
+            {/* Photo Display */}
+            <div style={{ position: "relative" }}>
+              <div style={{
+                width: 150,
+                height: 150,
+                borderRadius: 16,
+                background: "var(--m100)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 60,
+                overflow: "hidden",
+                border: "3px solid var(--m300)"
+              }}>
+                {profilePhoto ? (
+                  <img src={profilePhoto} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  user.gender?.toLowerCase() === "male" ? "👨" : "👩"
+                )}
+              </div>
+              <label style={{
+                position: "absolute",
+                bottom: 8,
+                right: 8,
+                background: "var(--m500)",
+                color: "white",
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: uploadingPhoto ? "not-allowed" : "pointer",
+                fontSize: 24,
+                border: "3px solid white",
+                opacity: uploadingPhoto ? 0.6 : 1
+              }}>
+                📷
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProfilePhotoUpload}
+                  style={{ display: "none" }}
+                  disabled={uploadingPhoto}
+                />
+              </label>
+            </div>
+
+            {/* User Info */}
+            <div style={{ textAlign: "center", width: "100%" }}>
+              <h2 style={{ fontSize: 24, marginBottom: 4, fontWeight: 700 }}>{user.name || "User"}</h2>
+              <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: 12, textTransform: "capitalize" }}>{user.gender || "Unknown"}</p>
+              <p style={{ color: "var(--mid)", fontSize: 14, marginBottom: 16 }}>{user.email}</p>
+              <p style={{ color: "var(--muted)", fontSize: 13, fontFamily: "monospace", fontWeight: 600 }}>ID: {user.id}</p>
+            </div>
+
+            {/* Upload Instructions */}
+            <div style={{
+              background: "var(--m50)",
+              padding: 20,
+              borderRadius: 12,
+              width: "100%",
+              textAlign: "center"
+            }}>
+              <p style={{ color: "var(--mid)", fontSize: 13, lineHeight: 1.6, margin: 0 }}>
+                {uploadingPhoto ? "⏳ Uploading..." : "📷 Click the camera icon above to upload or change your profile photo"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }
@@ -1341,51 +1545,62 @@ function Toast({ message, type, onClose }) {
 }
 /* ════════════════════ COMPREHENSIVE ANALYTICS ════════════════════ */
 function AnalyticsPage({ ratings, users, photos }) {
-  // Calculate overall rating statistics
-  let totalRatings = 0;
-  let ratingSum = 0;
-  const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 };
+  // Memoized calculations - will update when ratings or users change
+  const analyticsData = useMemo(() => {
+    let totalRatings = 0;
+    let ratingSum = 0;
+    const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 };
 
-  Object.values(ratings).forEach(photoRatings => {
-    Object.values(photoRatings).forEach(ratingData => {
-      totalRatings++;
-      ratingSum += ratingData.rating;
-      ratingDistribution[ratingData.rating]++;
+    Object.values(ratings).forEach(photoRatings => {
+      Object.values(photoRatings).forEach(ratingData => {
+        totalRatings++;
+        ratingSum += ratingData.rating;
+        ratingDistribution[ratingData.rating]++;
+      });
     });
-  });
 
-  const overallAverage = totalRatings ? (ratingSum / totalRatings).toFixed(2) : 0;
-  const maxDistribution = Math.max(...Object.values(ratingDistribution));
+    const overallAverage = totalRatings ? (ratingSum / totalRatings).toFixed(2) : 0;
+    const maxDistribution = Math.max(...Object.values(ratingDistribution));
 
-  // Gender Analysis
-  const maleUsers = Object.values(users).filter(u => u.gender === "male").length;
-  const femaleUsers = Object.values(users).filter(u => u.gender === "female").length;
+    // Gender Analysis - handle case-insensitive and missing values
+    const maleUsers = Object.values(users).filter(u => u.gender && u.gender.toLowerCase() === "male").length;
+    const femaleUsers = Object.values(users).filter(u => u.gender && u.gender.toLowerCase() === "female").length;
 
-  let maleRatings = 0, femaleRatings = 0, maleRatingSum = 0, femaleRatingSum = 0;
+    let maleRatings = 0, femaleRatings = 0, maleRatingSum = 0, femaleRatingSum = 0;
 
-  Object.values(ratings).forEach(photoRatings => {
-    Object.entries(photoRatings).forEach(([userId, ratingData]) => {
-      const user = users[userId];
-      if (!user) return;
+    Object.values(ratings).forEach(photoRatings => {
+      Object.entries(photoRatings).forEach(([userId, ratingData]) => {
+        const user = users[userId];
+        if (!user) return;
 
-      if (user.gender === "male") {
-        maleRatings++;
-        maleRatingSum += ratingData.rating;
-      } else if (user.gender === "female") {
-        femaleRatings++;
-        femaleRatingSum += ratingData.rating;
-      }
+        const userGender = user.gender ? user.gender.toLowerCase() : null;
+        if (userGender === "male") {
+          maleRatings++;
+          maleRatingSum += ratingData.rating;
+        } else if (userGender === "female") {
+          femaleRatings++;
+          femaleRatingSum += ratingData.rating;
+        }
+      });
     });
-  });
 
-  const maleAvg = maleRatings ? (maleRatingSum / maleRatings).toFixed(2) : 0;
-  const femaleAvg = femaleRatings ? (femaleRatingSum / femaleRatings).toFixed(2) : 0;
+    const maleAvg = maleRatings ? (maleRatingSum / maleRatings).toFixed(2) : 0;
+    const femaleAvg = femaleRatings ? (femaleRatingSum / femaleRatings).toFixed(2) : 0;
 
-  // Rating quality breakdown
-  const poor = Object.values(ratingDistribution).slice(0, 3).reduce((a, b) => a + b, 0);
-  const fair = Object.values(ratingDistribution).slice(3, 6).reduce((a, b) => a + b, 0);
-  const good = Object.values(ratingDistribution).slice(6, 9).reduce((a, b) => a + b, 0);
-  const excellent = ratingDistribution[10];
+    // Rating quality breakdown
+    const poor = Object.values(ratingDistribution).slice(0, 3).reduce((a, b) => a + b, 0);
+    const fair = Object.values(ratingDistribution).slice(3, 6).reduce((a, b) => a + b, 0);
+    const good = Object.values(ratingDistribution).slice(6, 9).reduce((a, b) => a + b, 0);
+    const excellent = ratingDistribution[10];
+
+    return {
+      totalRatings, ratingSum, ratingDistribution, overallAverage, maxDistribution,
+      maleUsers, femaleUsers, maleRatings, femaleRatings, maleAvg, femaleAvg,
+      poor, fair, good, excellent
+    };
+  }, [ratings, users]);
+
+  const { totalRatings, ratingDistribution, overallAverage, maxDistribution, maleUsers, femaleUsers, maleRatings, femaleRatings, maleAvg, femaleAvg, poor, fair, good, excellent } = analyticsData;
 
   return (
     <div style={{ marginBottom: 40 }}>
@@ -1570,9 +1785,9 @@ function AnalyticsPage({ ratings, users, photos }) {
           </div>
 
           {maleRatings > 0 && femaleRatings > 0 && (
-            <div style={{ marginTop: 24, padding: 16, background: "linear-gradient(135deg, var(--m50), #E0F9F3)", borderRadius: 14, border: "2px solid var(--m200)" }}>
-              <div style={{ fontSize: 13, color: "var(--mid)", fontWeight: 700 }}>💡 Key Insight:</div>
-              <div style={{ fontSize: 13, color: "var(--text)", marginTop: 8, lineHeight: 1.6 }}>
+            <div style={{ marginTop: 24, padding: 20, background: "linear-gradient(135deg, var(--m50), #E0F9F3)", borderRadius: 14, border: "2px solid var(--m200)" }}>
+              <div style={{ fontSize: 16, color: "var(--mid)", fontWeight: 700 }}>💡 Key Insight:</div>
+              <div style={{ fontSize: 16, color: "var(--text)", marginTop: 12, lineHeight: 1.6, fontWeight: 600 }}>
                 {Math.abs(maleAvg - femaleAvg) < 0.5
                   ? "✅ Male and female voters have nearly identical rating preferences, showing consistent evaluation criteria."
                   : maleAvg > femaleAvg
@@ -1587,10 +1802,13 @@ function AnalyticsPage({ ratings, users, photos }) {
   );
 }
 
+// Memoize AnalyticsPage to prevent unnecessary re-renders
+const AnalyticsPageMemoized = memo(AnalyticsPage);
+
 /* ════════════════════ GENDER ANALYTICS CHART ════════════════════ */
 function GenderAnalyticsChart({ ratings, users }) {
-  const maleUsers = Object.values(users).filter(u => u.gender === "male").length;
-  const femaleUsers = Object.values(users).filter(u => u.gender === "female").length;
+  const maleUsers = Object.values(users).filter(u => u.gender && u.gender.toLowerCase() === "male").length;
+  const femaleUsers = Object.values(users).filter(u => u.gender && u.gender.toLowerCase() === "female").length;
 
   let maleRatings = 0, femaleRatings = 0, maleRatingSum = 0, femaleRatingSum = 0;
 
@@ -1599,10 +1817,11 @@ function GenderAnalyticsChart({ ratings, users }) {
       const user = users[userId];
       if (!user) return;
 
-      if (user.gender === "male") {
+      const userGender = user.gender ? user.gender.toLowerCase() : null;
+      if (userGender === "male") {
         maleRatings++;
         maleRatingSum += ratingData.rating;
-      } else if (user.gender === "female") {
+      } else if (userGender === "female") {
         femaleRatings++;
         femaleRatingSum += ratingData.rating;
       }
@@ -1698,11 +1917,11 @@ function GenderAnalyticsChart({ ratings, users }) {
             </div>
 
             {maleRatings > 0 && femaleRatings > 0 && (
-              <div style={{ marginTop: 24, padding: 16, background: "linear-gradient(135deg, var(--m50), #E0F9F3)", borderRadius: 16, border: "1px solid var(--m200)" }}>
-                <div style={{ fontSize: 14, color: "var(--mid)", fontWeight: 600 }}>
-                  💡 Insight:
+              <div style={{ marginTop: 24, padding: 20, background: "linear-gradient(135deg, var(--m50), #E0F9F3)", borderRadius: 16, border: "1px solid var(--m200)" }}>
+                <div style={{ fontSize: 16, color: "var(--mid)", fontWeight: 700 }}>
+                  💡 Key Insight:
                 </div>
-                <div style={{ fontSize: 14, color: "var(--text)", marginTop: 6 }}>
+                <div style={{ fontSize: 16, color: "var(--text)", marginTop: 12, fontWeight: 600, lineHeight: 1.6 }}>
                   {Math.abs(maleAvg - femaleAvg) < 0.5
                     ? "Male and female voters have very similar rating preferences."
                     : maleAvg > femaleAvg
@@ -1731,11 +1950,62 @@ function AdminPage({ onBack }) {
   const [selectedPhotos, setSelectedPhotos] = useState(new Set());
   const [toast, setToast] = useState(null); // {type, message}
   const [saving, setSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState(null); // For user detail view
+  const [sortColumn, setSortColumn] = useState("name"); // 'name', 'id', 'rated', 'avgRating'
+  const [sortDirection, setSortDirection] = useState("asc"); // 'asc' or 'desc'
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedUserId) return;
 
-    const load = async () => {
+    // Validate file
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+    if (file.size > MAX_SIZE) {
+      setToast({ type: "err", message: "File size must be less than 5MB" });
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setToast({ type: "err", message: "Please select an image file" });
+      return;
+    }
+
+    try {
+      setUploadingPhoto(true);
+
+      // Convert to Data URL for preview and storage
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const dataUrl = event.target.result;
+        setPhotoPreview(dataUrl);
+
+        // Update in database
+        const success = await DB.updateUserProfilePhoto(selectedUserId, dataUrl);
+        if (success.ok) {
+          setToast({ type: "success", message: "Photo uploaded successfully!" });
+          // Reload data to show updated photo
+          await loadData();
+        } else {
+          setToast({ type: "err", message: `Failed to save photo: ${success.error?.message || 'Unknown error'}` });
+        }
+        setUploadingPhoto(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Photo upload error:", error);
+      setToast({ type: "err", message: "Failed to upload photo" });
+      setUploadingPhoto(false);
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
       const [nextPhotos, nextRatings, nextUsers] = await Promise.all([
         DB.getPhotos(),
         DB.getRatings(),
@@ -1747,24 +2017,38 @@ function AdminPage({ onBack }) {
         })()
       ]);
 
-      if (cancelled) return;
-
       setPhotos(nextPhotos || {});
       setRatings(nextRatings || {});
       setUsers(nextUsers || {});
 
-      // Load progress for all users
+      // Optimized: Load progress for all users in parallel with better error handling
       const progressPromises = Object.keys(nextUsers || {}).map(async (userId) => {
-        const prog = await DB.getProgress(userId);
-        return [userId, prog.ratedIds.length];
+        try {
+          const prog = await DB.getProgress(userId);
+          return [userId, prog.ratedIds.length];
+        } catch (e) {
+          console.warn(`Failed to load progress for ${userId}:`, e);
+          return [userId, 0];
+        }
       });
       const progressResults = await Promise.all(progressPromises);
       const progressMap = Object.fromEntries(progressResults);
       setUserProgress(progressMap);
-    };
+      setLastUpdated(new Date());
+    } catch (e) {
+      console.error("Failed to load admin data:", e);
+      setToast({ type: "err", message: "Failed to load data. Please try again." });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    load();
-
+  // Initial load
+  useEffect(() => {
+    let cancelled = false;
+    loadData().then(() => {
+      if (cancelled) return;
+    });
     return () => {
       cancelled = true;
     };
@@ -1818,286 +2102,543 @@ function AdminPage({ onBack }) {
     return { avg: vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : null, count: vals.length };
   };
 
+  const getSortedUsers = () => {
+    const usersList = Object.values(users);
+    const sorted = [...usersList].sort((a, b) => {
+      let aVal, bVal;
+
+      if (sortColumn === "id") {
+        aVal = (a.id || "").toLowerCase();
+        bVal = (b.id || "").toLowerCase();
+        return sortDirection === "asc"
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      } else if (sortColumn === "name") {
+        aVal = (a.name || "").toLowerCase();
+        bVal = (b.name || "").toLowerCase();
+        return sortDirection === "asc"
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      } else if (sortColumn === "rated") {
+        aVal = userProgress[a.id] || 0;
+        bVal = userProgress[b.id] || 0;
+      } else if (sortColumn === "avgRating") {
+        let aTotal = 0, aCount = 0;
+        Object.values(ratings).forEach(photoRatings => {
+          if (photoRatings && photoRatings[a.id]) {
+            const ratingVal = Number(photoRatings[a.id].rating);
+            if (!isNaN(ratingVal)) {
+              aTotal += ratingVal;
+              aCount++;
+            }
+          }
+        });
+        aVal = aCount > 0 ? aTotal / aCount : -1;
+
+        let bTotal = 0, bCount = 0;
+        Object.values(ratings).forEach(photoRatings => {
+          if (photoRatings && photoRatings[b.id]) {
+            const ratingVal = Number(photoRatings[b.id].rating);
+            if (!isNaN(ratingVal)) {
+              bTotal += ratingVal;
+              bCount++;
+            }
+          }
+        });
+        bVal = bCount > 0 ? bTotal / bCount : -1;
+      }
+
+      // For numeric columns (rated, avgRating)
+      if (sortDirection === "asc") {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      }
+    });
+
+    return sorted;
+  };
+
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const SortHeader = ({ column, label }) => {
+    const isActive = sortColumn === column;
+    const arrow = isActive ? (sortDirection === "asc" ? " ↑" : " ↓") : "";
+    return (
+      <button
+        onClick={() => handleSort(column)}
+        style={{
+          background: "none",
+          border: "none",
+          color: isActive ? "var(--m600)" : "var(--mid)",
+          fontSize: 11,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.07em",
+          cursor: "pointer",
+          padding: 0,
+          transition: "color 0.2s"
+        }}
+      >
+        {label}{arrow}
+      </button>
+    );
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
       <Navbar onBack={onBack} adminMode />
       <div className="page fade">
 
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 32, flexWrap: "wrap", gap: 16 }}>
-          <div>
-            <h1 style={{ fontFamily: "'DM Serif Display',serif", fontSize: 34 }}>Admin Panel</h1>
-            <p style={{ color: "var(--muted)", marginTop: 5, fontSize: 14 }}>
-              {allPhotos.length} photos &nbsp;·&nbsp; {celebrities.length} celebrities &nbsp;·&nbsp; {userCount} registered users
-            </p>
-          </div>
-          {/* Quick stats */}
-          <div style={{ display: "flex", gap: 12 }}>
-            {[{ l: "Photos", v: allPhotos.length }, { l: "Celebrities", v: celebrities.length }, { l: "Users", v: userCount }].map(s => (
-              <div key={s.l} className="card" style={{ padding: "12px 18px", textAlign: "center", minWidth: 80 }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: "var(--m500)" }}>{s.v}</div>
-                <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>{s.l}</div>
+        {/* ── USER DETAIL PAGE ── */}
+        {selectedUserId ? (
+          <>
+            <button onClick={() => setSelectedUserId(null)} style={{ marginBottom: 24, background: "var(--m100)", border: "none", color: "var(--m600)", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>← Back to Users</button>
+
+            <div style={{ marginBottom: 32 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 24 }}>
+                <div style={{ flex: 1 }}>
+                  <h1 style={{ fontFamily: "'DM Serif Display',serif", fontSize: 32, marginBottom: 4 }}>{users[selectedUserId]?.name || "User"}</h1>
+                  <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: 12, fontWeight: 500, textTransform: "capitalize" }}>{users[selectedUserId]?.gender || "Unknown"}</p>
+                  <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: 4 }}>{users[selectedUserId]?.email}</p>
+                  <p style={{ color: "var(--mid)", fontSize: 13, fontWeight: 600 }}>ID: <span style={{ fontFamily: "monospace", color: "var(--m500)" }}>{selectedUserId}</span></p>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+                  <div style={{ width: 100, height: 100, borderRadius: 12, background: "var(--m100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40, overflow: "hidden", flexShrink: 0, border: "2px solid var(--m200)" }}>
+                    {users[selectedUserId]?.profile_photo_url ? (
+                      <img src={users[selectedUserId].profile_photo_url} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      users[selectedUserId]?.gender?.toLowerCase() === "male" ? "👨" : "👩"
+                    )}
+                  </div>
+
+                  {/* Photo Upload Section */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      style={{ display: "none" }}
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingPhoto}
+                      style={{
+                        padding: "8px 12px",
+                        background: uploadingPhoto ? "var(--m200)" : "var(--m500)",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "6px",
+                        cursor: uploadingPhoto ? "not-allowed" : "pointer",
+                        fontSize: "12px",
+                        fontWeight: "600",
+                        transition: "all 0.3s ease",
+                        opacity: uploadingPhoto ? 0.6 : 1
+                      }}
+                    >
+                      {uploadingPhoto ? "Uploading..." : "📸 Add Photo"}
+                    </button>
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 28, background: "var(--m50)", borderRadius: 12, padding: 6, width: "fit-content", flexWrap: "wrap" }}>
-          {[
-            { id: "add", label: "+ Add Photos" },
-            { id: "photos", label: "📸 All Photos" },
-            { id: "users", label: "👥 Users" },
-            { id: "analytics", label: "📊 Analytics" },
-            { id: "export", label: "💾 Export Data" },
-          ].map(t => (
-            <button key={t.id} className={`tab-btn${tab === t.id ? " active" : ""}`} onClick={() => setTab(t.id)}>{t.label}</button>
-          ))}
-        </div>
+              {/* Stats cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
+                <div className="card" style={{ padding: 20, textAlign: "center" }}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>👤</div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: "var(--m500)", marginBottom: 4 }}>{users[selectedUserId]?.gender?.charAt(0).toUpperCase() + users[selectedUserId]?.gender?.slice(1)}</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600 }}>Gender</div>
+                </div>
 
-        {/* ── ANALYTICS TAB ── */}
-        {tab === "analytics" && (
-          <AnalyticsPage ratings={ratings} users={users} photos={photos} />
-        )}
+                <div className="card" style={{ padding: 20, textAlign: "center" }}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>📊</div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: "var(--m500)", marginBottom: 4 }}>{userProgress[selectedUserId] || 0}</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600 }}>Total Rated</div>
+                </div>
 
-        {/* ── ADD PHOTOS TAB ── */}
-        {tab === "add" && (
-          <div className="card" style={{ padding: 36, maxWidth: 580 }}>
-            <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>Add Celebrity Photos</h3>
-
-            <div style={{ marginBottom: 24 }}>
-              <label className="lbl">Celebrity Name</label>
-              <input className="inp" placeholder="e.g. Shakib Al Hasan" value={celebrity} onChange={e => setCeleb(e.target.value)} />
+                <div className="card" style={{ padding: 20, textAlign: "center" }}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>⭐</div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: "var(--m500)", marginBottom: 4 }}>
+                    {(() => {
+                      let totalRating = 0;
+                      let ratingCount = 0;
+                      Object.values(ratings).forEach(photoRatings => {
+                        if (photoRatings && photoRatings[selectedUserId]) {
+                          const ratingVal = Number(photoRatings[selectedUserId].rating);
+                          if (!isNaN(ratingVal)) {
+                            totalRating += ratingVal;
+                            ratingCount++;
+                          }
+                        }
+                      });
+                      return ratingCount > 0 ? (totalRating / ratingCount).toFixed(2) : "-";
+                    })()}
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600 }}>Avg Rating</div>
+                </div>
+              </div>
             </div>
 
-            <div style={{ marginBottom: 28 }}>
-              <label className="lbl">Photo URLs (add up to 5 photos)</label>
-              <div style={{ maxHeight: "300px", overflowY: "auto", paddingRight: 8 }}>
-                {urls.map((u, i) => (
-                  <div key={i} style={{ marginBottom: 10, display: "flex", gap: 8, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "var(--muted)", minWidth: 28, fontWeight: 600, textAlign: "right" }}>#{i + 1}</span>
-                    <input className="inp" placeholder={`Paste direct image URL for photo ${i + 1}`}
-                      value={u} onChange={e => { const n = [...urls]; n[i] = e.target.value; setUrls(n); }} />
+            {/* Rated photos */}
+            <div>
+              <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Rated Photos</h2>
+              <div style={{ display: "grid", gap: 12 }}>
+                {(() => {
+                  const userRatings = [];
+                  Object.entries(ratings).forEach(([photoId, photoRatings]) => {
+                    if (photoRatings && photoRatings[selectedUserId]) {
+                      const photo = photos[photoId];
+                      userRatings.push({
+                        photoId,
+                        photo,
+                        rating: photoRatings[selectedUserId].rating,
+                        ratedAt: photoRatings[selectedUserId].ratedAt
+                      });
+                    }
+                  });
+
+                  if (userRatings.length === 0) {
+                    return <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>No ratings yet</div>;
+                  }
+
+                  return userRatings.map(r => (
+                    <div key={r.photoId} className="card" style={{ display: "grid", gridTemplateColumns: "140px 1fr 120px", gap: 20, alignItems: "center", padding: 20 }}>
+                      {r.photo?.url && <img src={r.photo.url} alt={r.photo?.celebrity} style={{ width: 140, height: 140, objectFit: "cover", borderRadius: 12 }} />}
+                      <div>
+                        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{r.photo?.celebrity}</div>
+                        <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Photo ID: <span style={{ fontFamily: "monospace" }}>{r.photoId}</span></div>
+                        {r.ratedAt && <div style={{ fontSize: 12, color: "var(--muted)" }}>Rated: {new Date(r.ratedAt).toLocaleString()}</div>}
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 42, fontWeight: 800, color: "var(--m500)" }}>{r.rating}</div>
+                        <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600 }}>/ 10</div>
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 32, flexWrap: "wrap", gap: 16 }}>
+              <div>
+                <h1 style={{ fontFamily: "'DM Serif Display',serif", fontSize: 34 }}>Admin Panel</h1>
+                {lastUpdated && <p style={{ color: "var(--muted)", marginTop: 5, fontSize: 14, fontWeight: 600 }}>🔄 Last updated: {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}</p>}
+              </div>
+              {/* Quick stats */}
+              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                {[{ l: "Photos", v: allPhotos.length }, { l: "Celebrities", v: celebrities.length }, { l: "Users", v: userCount }].map(s => (
+                  <div key={s.l} className="card" style={{ padding: "12px 18px", textAlign: "center", minWidth: 80 }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: "var(--m500)" }}>{s.v}</div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>{s.l}</div>
                   </div>
                 ))}
               </div>
-              <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 12 }}>💡 Images count: {urls.filter(u => u.trim()).length}/5 &nbsp;·&nbsp; Use direct image links (ending in .jpg, .png, etc.)</p>
             </div>
 
-            <button className="btn btn-p" onClick={addPhotos} disabled={saving} style={{ padding: "13px 28px" }}>
-              {saving ? "Adding…" : `+ Add Photos for ${celebrity || "Celebrity"}`}
-            </button>
-          </div>
-        )}
+            {/* Tabs */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 28, background: "var(--m50)", borderRadius: 12, padding: 6, width: "fit-content", flexWrap: "wrap" }}>
+              {[
+                { id: "add", label: "➕ Add Photos" },
+                { id: "photos", label: "📸 All Photos" },
+                { id: "users", label: "👥 Users" },
+                { id: "analytics", label: "📊 Analytics" },
+                { id: "export", label: "💾 Export Data" },
+              ].map(t => (
+                <button key={t.id} className={`tab-btn${tab === t.id ? " active" : ""}`} onClick={() => setTab(t.id)}>{t.label}</button>
+              ))}
+            </div>
 
-        {/* ── ALL PHOTOS TAB ── */}
-        {tab === "photos" && (
-          <div>
-            {/* Search/Filter */}
-            <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
-              <input
-                className="inp"
-                placeholder="Search celebrities..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                style={{ maxWidth: 300 }}
-              />
-              {selectedPhotos.size > 0 && (
-                <div style={{ display: "flex", gap: 12 }}>
-                  <button className="btn btn-danger btn-sm" onClick={async () => {
-                    if (!confirm(`Delete ${selectedPhotos.size} selected photo(s)? This action cannot be undone.`)) return;
-                    const remainingPhotos = { ...photos };
-                    for (const photoId of selectedPhotos) {
-                      await DB.deletePhoto(photoId);
-                      delete remainingPhotos[photoId];
-                    }
-                    setPhotos(remainingPhotos);
-                    setSelectedPhotos(new Set());
-                    setToast({ type: "ok", message: `✅ Deleted ${selectedPhotos.size} photo(s).` });
-                  }}>
-                    🗑️ Delete Selected ({selectedPhotos.size})
-                  </button>
-                  <button className="btn btn-o btn-sm" onClick={() => setSelectedPhotos(new Set())}>
-                    Deselect All
-                  </button>
+            {/* ── ANALYTICS TAB ── */}
+            {tab === "analytics" && (
+              isLoading ? (
+                <div style={{ textAlign: "center", padding: "60px 40px" }}>
+                  <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: "var(--mid)", marginBottom: 8 }}>Loading Analytics...</div>
+                  <div style={{ fontSize: 14, color: "var(--muted)" }}>Please wait while we analyze the data</div>
                 </div>
-              )}
-            </div>
+              ) : (
+                <AnalyticsPageMemoized ratings={ratings} users={users} photos={photos} />
+              )
+            )}
 
-            {celebrities.length === 0 ? (
-              <div className="card" style={{ padding: 72, textAlign: "center" }}>
-                <div style={{ fontSize: 52, marginBottom: 14 }}>📭</div>
-                <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--muted)" }}>No photos added yet</h3>
-                <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 6 }}>Switch to "Add Photos" to get started.</p>
+            {/* ── ADD PHOTOS TAB ── */}
+            {tab === "add" && (
+              <div className="card" style={{ padding: 36, maxWidth: 580 }}>
+                <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>Add Celebrity Photos</h3>
+
+                <div style={{ marginBottom: 24 }}>
+                  <label className="lbl">Celebrity Name</label>
+                  <input className="inp" placeholder="e.g. Lionel Messi" value={celebrity} onChange={e => setCeleb(e.target.value)} />
+                </div>
+
+                <div style={{ marginBottom: 28 }}>
+                  <label className="lbl">Photo URLs (add up to 5 photos)</label>
+                  <div style={{ maxHeight: "300px", overflowY: "auto", paddingRight: 8 }}>
+                    {urls.map((u, i) => (
+                      <div key={i} style={{ marginBottom: 10, display: "flex", gap: 8, alignItems: "center" }}>
+                        <span style={{ fontSize: 12, color: "var(--muted)", minWidth: 28, fontWeight: 600, textAlign: "right" }}>#{i + 1}</span>
+                        <input className="inp" placeholder={`Paste direct image URL for photo ${i + 1}`}
+                          value={u} onChange={e => { const n = [...urls]; n[i] = e.target.value; setUrls(n); }} />
+                      </div>
+                    ))}
+                  </div>
+                  <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 12 }}>💡 Images count: {urls.filter(u => u.trim()).length}/5 &nbsp;·&nbsp; Use direct image links (ending in .jpg, .png, etc.)</p>
+                </div>
+
+                <button className="btn btn-p" onClick={addPhotos} disabled={saving} style={{ padding: "13px 28px" }}>
+                  {saving ? "Adding…" : `+ Add Photos for ${celebrity || "Celebrity"}`}
+                </button>
               </div>
-            ) : celebrities
-              .filter(celeb => !searchQuery || celeb.toLowerCase().includes(searchQuery.toLowerCase()))
-              .map(celeb => {
-                const cp = allPhotos.filter(p => p.celebrity === celeb);
-                return (
-                  <div key={celeb} style={{ marginBottom: 36 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                      <h3 style={{ fontSize: 19, fontWeight: 700 }}>{celeb}</h3>
-                      <span style={{ background: "var(--m100)", color: "var(--m600)", padding: "3px 12px", borderRadius: 100, fontSize: 12, fontWeight: 700 }}>{cp.length} photos</span>
-                      <span style={{ background: "rgba(255,255,255,0.8)", color: "var(--mid)", padding: "3px 12px", borderRadius: 100, fontSize: 12, fontWeight: 600, textTransform: "capitalize", border: "1px solid var(--border)" }}>{cp[0]?.gender}</span>
-                      <button
-                        className="btn btn-o btn-sm"
-                        onClick={() => {
-                          const celebPhotoIds = cp.map(p => p.id);
-                          const allSelected = celebPhotoIds.every(id => selectedPhotos.has(id));
-                          const newSelected = new Set(selectedPhotos);
-                          if (allSelected) {
-                            celebPhotoIds.forEach(id => newSelected.delete(id));
-                          } else {
-                            celebPhotoIds.forEach(id => newSelected.add(id));
-                          }
-                          setSelectedPhotos(newSelected);
-                        }}
-                        style={{ fontSize: 11, padding: "2px 8px" }}
-                      >
-                        {cp.every(p => selectedPhotos.has(p.id)) ? "Deselect All" : "Select All"}
+            )}
+
+            {/* ── ALL PHOTOS TAB ── */}
+            {tab === "photos" && (
+              <div>
+                {/* Search/Filter */}
+                <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+                  <input
+                    className="inp"
+                    placeholder="Search celebrities..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    style={{ maxWidth: 300 }}
+                  />
+                  {selectedPhotos.size > 0 && (
+                    <div style={{ display: "flex", gap: 12 }}>
+                      <button className="btn btn-danger btn-sm" onClick={async () => {
+                        if (!confirm(`Delete ${selectedPhotos.size} selected photo(s)? This action cannot be undone.`)) return;
+                        const remainingPhotos = { ...photos };
+                        for (const photoId of selectedPhotos) {
+                          await DB.deletePhoto(photoId);
+                          delete remainingPhotos[photoId];
+                        }
+                        setPhotos(remainingPhotos);
+                        setSelectedPhotos(new Set());
+                        setToast({ type: "ok", message: `✅ Deleted ${selectedPhotos.size} photo(s).` });
+                      }}>
+                        🗑️ Delete Selected ({selectedPhotos.size})
+                      </button>
+                      <button className="btn btn-o btn-sm" onClick={() => setSelectedPhotos(new Set())}>
+                        Deselect All
                       </button>
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 14 }}>
-                      {cp.map(photo => {
-                        const { avg, count } = getStats(photo.id);
-                        return <AdminPhotoCard
-                          key={photo.id}
-                          photo={photo}
-                          avg={avg}
-                          count={count}
-                          onDelete={() => deletePhoto(photo.id)}
-                          isSelected={selectedPhotos.has(photo.id)}
-                          onToggleSelect={() => {
-                            const newSelected = new Set(selectedPhotos);
-                            if (newSelected.has(photo.id)) {
-                              newSelected.delete(photo.id);
-                            } else {
-                              newSelected.add(photo.id);
-                            }
-                            setSelectedPhotos(newSelected);
-                          }}
-                        />;
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        )}
+                  )}
+                </div>
 
-        {/* ── USERS TAB ── */}
-        {tab === "users" && (
-          <div>
-            {userCount === 0 ? (
-              <div className="card" style={{ padding: 60, textAlign: "center" }}>
-                <div style={{ fontSize: 48, marginBottom: 14 }}>👥</div>
-                <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--muted)" }}>No users registered yet</h3>
-              </div>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <div style={{ display: "grid", gap: 10 }}>
-                  {/* Header */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 100px 100px", gap: 12, padding: "10px 20px", background: "var(--m50)", borderRadius: 10, fontSize: 11, fontWeight: 700, color: "var(--mid)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                    <span>Student ID</span><span>Email</span><span>Gender</span><span>Rated</span>
+                {celebrities.length === 0 ? (
+                  <div className="card" style={{ padding: 72, textAlign: "center" }}>
+                    <div style={{ fontSize: 52, marginBottom: 14 }}>📭</div>
+                    <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--muted)" }}>No photos added yet</h3>
+                    <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 6 }}>Switch to "Add Photos" to get started.</p>
                   </div>
-                  {Object.values(users).map(u => {
-                    const ratedCount = userProgress[u.id] || 0;
+                ) : celebrities
+                  .filter(celeb => !searchQuery || celeb.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map(celeb => {
+                    const cp = allPhotos.filter(p => p.celebrity === celeb);
                     return (
-                      <div key={u.id} className="card" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 100px 100px", gap: 12, padding: "14px 20px", alignItems: "center" }}>
-                        <span style={{ fontWeight: 700, color: "var(--m500)", fontFamily: "monospace", fontSize: 14 }}>{u.id}</span>
-                        <span style={{ color: "var(--mid)", fontSize: 14 }}>{u.email}</span>
-                        <span style={{ textTransform: "capitalize", fontSize: 14, color: "var(--muted)" }}>{u.gender}</span>
-                        <span style={{ fontSize: 13, color: "var(--muted)" }}>{ratedCount}</span>
+                      <div key={celeb} style={{ marginBottom: 36 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                          <h3 style={{ fontSize: 19, fontWeight: 700 }}>{celeb}</h3>
+                          <span style={{ background: "var(--m100)", color: "var(--m600)", padding: "3px 12px", borderRadius: 100, fontSize: 12, fontWeight: 700 }}>{cp.length} photos</span>
+                          <span style={{ background: "rgba(255,255,255,0.8)", color: "var(--mid)", padding: "3px 12px", borderRadius: 100, fontSize: 12, fontWeight: 600, textTransform: "capitalize", border: "1px solid var(--border)" }}>{cp[0]?.gender}</span>
+                          <button
+                            className="btn btn-o btn-sm"
+                            onClick={() => {
+                              const celebPhotoIds = cp.map(p => p.id);
+                              const allSelected = celebPhotoIds.every(id => selectedPhotos.has(id));
+                              const newSelected = new Set(selectedPhotos);
+                              if (allSelected) {
+                                celebPhotoIds.forEach(id => newSelected.delete(id));
+                              } else {
+                                celebPhotoIds.forEach(id => newSelected.add(id));
+                              }
+                              setSelectedPhotos(newSelected);
+                            }}
+                            style={{ fontSize: 11, padding: "2px 8px" }}
+                          >
+                            {cp.every(p => selectedPhotos.has(p.id)) ? "Deselect All" : "Select All"}
+                          </button>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 14 }}>
+                          {cp.map(photo => {
+                            const { avg, count } = getStats(photo.id);
+                            return <AdminPhotoCard
+                              key={photo.id}
+                              photo={photo}
+                              avg={avg}
+                              count={count}
+                              onDelete={() => deletePhoto(photo.id)}
+                              isSelected={selectedPhotos.has(photo.id)}
+                              onToggleSelect={() => {
+                                const newSelected = new Set(selectedPhotos);
+                                if (newSelected.has(photo.id)) {
+                                  newSelected.delete(photo.id);
+                                } else {
+                                  newSelected.add(photo.id);
+                                }
+                                setSelectedPhotos(newSelected);
+                              }}
+                            />;
+                          })}
+                        </div>
                       </div>
                     );
                   })}
+              </div>
+            )}
+
+            {/* ── USERS TAB ── */}
+            {tab === "users" && (
+              <div>
+                {userCount === 0 ? (
+                  <div className="card" style={{ padding: 60, textAlign: "center" }}>
+                    <div style={{ fontSize: 48, marginBottom: 14 }}>👥</div>
+                    <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--muted)" }}>No users registered yet</h3>
+                  </div>
+                ) : (
+                  <div style={{ overflowX: "auto" }}>
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {/* Header */}
+                      <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 1fr 100px 100px 100px", gap: 12, padding: "10px 20px", background: "var(--m50)", borderRadius: 10, fontSize: 11, fontWeight: 700, color: "var(--mid)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                        <span>Photo</span>
+                        <SortHeader column="id" label="Student ID" />
+                        <span>Email</span>
+                        <span>Gender</span>
+                        <SortHeader column="rated" label="Rated" />
+                        <SortHeader column="avgRating" label="Avg Rating" />
+                      </div>
+                      {getSortedUsers().map(u => {
+                        const ratedCount = userProgress[u.id] || 0;
+                        // Calculate average rating for this user
+                        let totalRating = 0;
+                        let ratingCount = 0;
+                        Object.values(ratings).forEach(photoRatings => {
+                          if (photoRatings && photoRatings[u.id]) {
+                            const ratingVal = Number(photoRatings[u.id].rating);
+                            if (!isNaN(ratingVal)) {
+                              totalRating += ratingVal;
+                              ratingCount++;
+                            }
+                          }
+                        });
+                        const avgRating = ratingCount > 0 ? (totalRating / ratingCount).toFixed(2) : "-";
+
+                        return (
+                          <div key={u.id} className="card" style={{ display: "grid", gridTemplateColumns: "100px 1fr 1fr 100px 100px 100px", gap: 12, padding: "14px 20px", alignItems: "center", cursor: "pointer", transition: "all 0.2s" }} onClick={() => setSelectedUserId(u.id)} onMouseEnter={(e) => e.currentTarget.style.background = "var(--m50)"} onMouseLeave={(e) => e.currentTarget.style.background = ""}>
+                            <div style={{ width: 60, height: 60, borderRadius: 8, background: "var(--m100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, overflow: "hidden" }}>
+                              {u.profile_photo_url ? (
+                                <img src={u.profile_photo_url} alt={u.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              ) : (
+                                u.gender?.toLowerCase() === "male" ? "👨" : "👩"
+                              )}
+                            </div>
+                            <span style={{ fontWeight: 700, color: "var(--m500)", fontFamily: "monospace", fontSize: 14 }}>{u.id}</span>
+                            <span style={{ color: "var(--mid)", fontSize: 14 }}>{u.email}</span>
+                            <span style={{ textTransform: "capitalize", fontSize: 14, color: "var(--muted)" }}>{u.gender}</span>
+                            <span style={{ fontSize: 13, color: "var(--muted)" }}>{ratedCount}</span>
+                            <span style={{ fontSize: 13, color: "var(--m500)", fontWeight: 600 }}>{avgRating}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ marginTop: 20, textAlign: "center" }}>
+                      <p style={{ color: "var(--muted)", fontSize: 13 }}>Total registered users: <strong>{userCount}</strong></p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── EXPORT DATA TAB ── */}
+            {tab === "export" && (
+              <div className="card" style={{ padding: 36 }}>
+                <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>Export Rating Data</h3>
+                <p style={{ color: "var(--muted)", marginBottom: 28, lineHeight: 1.6 }}>
+                  Download comprehensive rating data including all user ratings, averages, and statistics in CSV format.
+                </p>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 28 }}>
+                  <div className="card" style={{ padding: 20, textAlign: "center", background: "#ffffff" }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{Object.keys(ratings).length}</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>Photos with Ratings</div>
+                  </div>
+                  <div className="card" style={{ padding: 20, textAlign: "center", background: "#ffffff" }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>👥</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{userCount}</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>Active Users</div>
+                  </div>
+                  <div className="card" style={{ padding: 20, textAlign: "center", background: "#ffffff" }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>⭐</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>
+                      {Object.values(ratings).reduce((sum, photoRatings) => sum + Object.keys(photoRatings).length, 0)}
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>Total Ratings</div>
+                  </div>
                 </div>
-                <div style={{ marginTop: 20, textAlign: "center" }}>
-                  <p style={{ color: "var(--muted)", fontSize: 13 }}>Total registered users: <strong>{userCount}</strong></p>
+
+                <button className="btn btn-p" style={{ width: "100%", padding: "16px" }} onClick={() => {
+                  // Generate CSV data
+                  const csvData = [];
+                  csvData.push(['Photo ID', 'Celebrity', 'Gender', 'User ID', 'Rating', 'Comment', 'Rated At']);
+
+                  Object.entries(ratings).forEach(([photoId, photoRatings]) => {
+                    const photo = photos[photoId];
+                    if (!photo) return;
+
+                    Object.entries(photoRatings).forEach(([userId, ratingData]) => {
+                      csvData.push([
+                        photoId,
+                        photo.celebrity,
+                        photo.gender,
+                        userId,
+                        ratingData.rating,
+                        `"${ratingData.comment || ''}"`,
+                        new Date(ratingData.ratedAt).toLocaleString()
+                      ]);
+                    });
+                  });
+
+                  const csvContent = csvData.map(row => row.join(',')).join('\n');
+                  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                  const link = document.createElement('a');
+                  link.href = URL.createObjectURL(blob);
+                  link.download = `facrate-bd-ratings-${new Date().toISOString().split('T')[0]}.csv`;
+                  link.click();
+                }}>
+                  📥 Download Ratings CSV
+                </button>
+
+                <div style={{ marginTop: 36, paddingTop: 24, borderTop: "1px solid var(--border)" }}>
+                  <h4 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: "#991b1b" }}>⚠️ Danger Zone</h4>
+                  <p style={{ color: "var(--muted)", marginBottom: 16, fontSize: 14 }}>Clear all app data including users, photos, ratings, and sessions. This action cannot be undone.</p>
+                  <button className="btn btn-danger" style={{ width: "100%", padding: "12px" }} onClick={() => {
+                    if (confirm("🚨 Are you SURE? This will delete ALL data and reset the app to first-time use.")) {
+                      localStorage.clear();
+                      sessionStorage.clear();
+                      window.location.reload();
+                    }
+                  }}>
+                    ⚡ Clear All Data & Reset App
+                  </button>
                 </div>
               </div>
             )}
-          </div>
+          </>
         )}
-
-        {/* ── EXPORT DATA TAB ── */}
-        {tab === "export" && (
-          <div className="card" style={{ padding: 36 }}>
-            <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>Export Rating Data</h3>
-            <p style={{ color: "var(--muted)", marginBottom: 28, lineHeight: 1.6 }}>
-              Download comprehensive rating data including all user ratings, averages, and statistics in CSV format.
-            </p>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 28 }}>
-              <div className="card" style={{ padding: 20, textAlign: "center", background: "#ffffff" }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
-                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{Object.keys(ratings).length}</div>
-                <div style={{ fontSize: 12, color: "var(--muted)" }}>Photos with Ratings</div>
-              </div>
-              <div className="card" style={{ padding: 20, textAlign: "center", background: "#ffffff" }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>👥</div>
-                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{userCount}</div>
-                <div style={{ fontSize: 12, color: "var(--muted)" }}>Active Users</div>
-              </div>
-              <div className="card" style={{ padding: 20, textAlign: "center", background: "#ffffff" }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>⭐</div>
-                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>
-                  {Object.values(ratings).reduce((sum, photoRatings) => sum + Object.keys(photoRatings).length, 0)}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--muted)" }}>Total Ratings</div>
-              </div>
-            </div>
-
-            <button className="btn btn-p" style={{ width: "100%", padding: "16px" }} onClick={() => {
-              // Generate CSV data
-              const csvData = [];
-              csvData.push(['Photo ID', 'Celebrity', 'Gender', 'User ID', 'Rating', 'Comment', 'Rated At']);
-
-              Object.entries(ratings).forEach(([photoId, photoRatings]) => {
-                const photo = photos[photoId];
-                if (!photo) return;
-
-                Object.entries(photoRatings).forEach(([userId, ratingData]) => {
-                  csvData.push([
-                    photoId,
-                    photo.celebrity,
-                    photo.gender,
-                    userId,
-                    ratingData.rating,
-                    `"${ratingData.comment || ''}"`,
-                    new Date(ratingData.ratedAt).toLocaleString()
-                  ]);
-                });
-              });
-
-              const csvContent = csvData.map(row => row.join(',')).join('\n');
-              const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-              const link = document.createElement('a');
-              link.href = URL.createObjectURL(blob);
-              link.download = `facrate-bd-ratings-${new Date().toISOString().split('T')[0]}.csv`;
-              link.click();
-            }}>
-              📥 Download Ratings CSV
-            </button>
-
-            <div style={{ marginTop: 36, paddingTop: 24, borderTop: "1px solid var(--border)" }}>
-              <h4 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: "#991b1b" }}>⚠️ Danger Zone</h4>
-              <p style={{ color: "var(--muted)", marginBottom: 16, fontSize: 14 }}>Clear all app data including users, photos, ratings, and sessions. This action cannot be undone.</p>
-              <button className="btn btn-danger" style={{ width: "100%", padding: "12px" }} onClick={() => {
-                if (confirm("🚨 Are you SURE? This will delete ALL data and reset the app to first-time use.")) {
-                  localStorage.clear();
-                  sessionStorage.clear();
-                  window.location.reload();
-                }
-              }}>
-                ⚡ Clear All Data & Reset App
-              </button>
-            </div>
-          </div>
-        )}
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       </div>
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

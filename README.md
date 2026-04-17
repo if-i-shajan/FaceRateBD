@@ -118,6 +118,7 @@ Current admin password in code: `adminbaby`
 | email | TEXT | User email |
 | gender | TEXT | Gender value from signup |
 | password | TEXT | Stored directly in current implementation |
+| profile_photo_url | TEXT | Profile photo (Data URL) |
 | created_at | TIMESTAMP | Account created time |
 
 ### photos
@@ -181,6 +182,45 @@ Current admin password in code: `adminbaby`
 - [x] Admin upload/delete photos
 - [x] Admin analytics and CSV export
 - [x] Firebase deployment
+- [x] User profile photo upload with preview
+- [x] Profile photo display with gender emoji fallback (👨/👩)
+- [x] Admin panel user detail view with photo upload
+- [x] Admin panel Users table sorting (by name, student ID, avg rating, total rated)
+- [x] Admin panel Add Photos tab with UI improvements
+- [x] Professional button styling with hover effects
+
+## New Features (Recent Updates)
+
+### User Profile Photos
+- Users can upload profile photos from their dashboard
+- Photos are stored as Data URLs in the database
+- Circular avatar display with 5MB file size limit
+- Gender-based emoji fallback (👨 for male, 👩 for female) when no photo is available
+
+### Admin Panel Enhancements
+1. **User Detail View with Photo Upload**
+   - View detailed user statistics and ratings
+   - Upload profile photos directly from admin panel
+   - Display circular avatars with fallback emoji
+   - See all photos rated by the user with ratings
+
+2. **Users Table Sorting**
+   - Sort users by Student ID, Name, Average Rating, or Total Rated
+   - Toggle between ascending and descending order
+   - Dropdown controls for easy navigation
+
+3. **Improved Admin Panel Tabs**
+   - ➕ Add Photos (new tab on left)
+   - 📸 All Photos
+   - 👥 Users
+   - 📊 Analytics
+   - 💾 Export Data
+
+4. **UI Improvements**
+   - Professional gradient buttons with hover effects
+   - Smooth animations and transitions
+   - Better spacing and visual hierarchy
+   - Enhanced user experience with better feedback
 
 ## Security Notes
 
