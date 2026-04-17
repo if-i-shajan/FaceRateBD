@@ -217,7 +217,8 @@ function strongShuffle(arr) {
   return shuffled;
 }
 
-const ADMIN_PASS = "adminbaby";
+
+const ADMIN_PASS_HASH = import.meta.env.VITE_ADMIN_PASS_HASH || "$2b$10$3mEcpF4cc5CvYWhMCvetfeYxKXXP3FkhiSZkn1CFDj9OJ4TyhbQqK";
 const SESS_MAX = 500;
 const COOL_AT = 20;
 const COOL_SECS = 15;
@@ -244,8 +245,10 @@ function SignupPage({ onBack, onSignupSuccess }) {
       return setErr("Student ID must follow format: 232-15-001");
     }
 
-    if (!email.includes("@")) {
-      return setErr("Please enter a valid email address.");
+    // Improved email validation (proper gmail/email format)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return setErr("Wrong email format. Please enter a valid email address (e.g., user@gmail.com).");
     }
 
     if (pw.length < 6) {
@@ -259,6 +262,21 @@ function SignupPage({ onBack, onSignupSuccess }) {
     setLoading(true);
 
     try {
+      // Check if student ID already exists
+      const existingUser = await DB.getUser(studentId);
+      if (existingUser) {
+        setLoading(false);
+        return setErr("This Student ID is already in use. Please use a different ID.");
+      }
+
+      // Check if email already exists
+      const allUsers = await DB.getAllUsers();
+      const emailExists = allUsers.some(user => user.email.toLowerCase() === email.toLowerCase());
+      if (emailExists) {
+        setLoading(false);
+        return setErr("This email address is already in use. Please use a different email.");
+      }
+
       // Hash password before saving
       const hashedPassword = await bcrypt.hash(pw, 10);
 
@@ -599,8 +617,21 @@ export default function App() {
       const user = await DB.getUser(id);
       if (!user) return setErr("No account found with this ID.");
 
-      // Compare password with hashed password
-      const passwordMatch = await bcrypt.compare(pw, user.password);
+      // Handle both hashed passwords (new users) and plain text (old users)
+      let passwordMatch = false;
+      const storedPassword = user.password;
+
+      // Check if stored password looks like a bcrypt hash (starts with $2a$, $2b$, $2y$, or $2x$)
+      const isBcryptHash = storedPassword && /^\$2[aby]\$/.test(storedPassword);
+
+      if (isBcryptHash) {
+        // New users: compare with bcrypt hash
+        passwordMatch = await bcrypt.compare(pw, storedPassword);
+      } else {
+        // Old users: plain text comparison (backward compatibility)
+        passwordMatch = pw === storedPassword;
+      }
+
       if (!passwordMatch) return setErr("Incorrect password.");
 
       // Save to session without password
@@ -797,10 +828,20 @@ function LoginPage({ onLogin, onSignup, onAdmin, onTerms, err }) {
 function AdminLoginPage({ onBack, onOk }) {
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const check = () => {
-    if (pw === ADMIN_PASS) onOk();
-    else setErr("Incorrect admin password.");
+  const check = async () => {
+    if (!pw) return setErr("Please enter password.");
+    setLoading(true);
+    try {
+      const passwordMatch = await bcrypt.compare(pw, ADMIN_PASS_HASH);
+      if (passwordMatch) onOk();
+      else setErr("Incorrect admin password.");
+    } catch (error) {
+      setErr(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -817,10 +858,10 @@ function AdminLoginPage({ onBack, onOk }) {
           <div style={{ marginBottom: 8 }}>
             <label className="lbl">Admin Password</label>
             <input className="inp" type="password" placeholder="Enter admin password" value={pw}
-              onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && check()} />
+              onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && !loading && check()} disabled={loading} />
           </div>
           <div style={{ marginTop: 20 }}>
-            <button className="btn btn-p" style={{ width: "100%", padding: "14px" }} onClick={check}>Enter Admin Panel →</button>
+            <button className="btn btn-p" style={{ width: "100%", padding: "14px", opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }} onClick={check} disabled={loading}>{loading ? "Verifying..." : "Enter Admin Panel →"}</button>
           </div>
         </div>
       </div>
@@ -1385,7 +1426,15 @@ function RatingPage({ user, onDone }) {
           {/* Rating UI */}
           <div style={{ padding: 36, background: "#ffffff" }}>
             <div style={{ marginBottom: 28 }}>
-              <p style={{ fontWeight: 800, fontSize: 18, marginBottom: 8, color: "var(--text)", fontFamily: "'Poppins',sans-serif" }}>Rate this photo</p>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <p style={{ fontWeight: 800, fontSize: 18, color: "var(--text)", fontFamily: "'Poppins',sans-serif", margin: 0 }}>Rate this photo</p>
+                {rating > 0 && (
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 12, background: "#ffffff", border: "2px solid var(--m200)", borderRadius: 16, padding: "8px 16px", animation: "popIn 0.4s ease", boxShadow: "0 8px 22px rgba(53,153,113,0.08)" }}>
+                    <span style={{ fontWeight: 900, color: "var(--m500)", fontSize: 24, fontFamily: "'Poppins',sans-serif" }}>{rating}<span style={{ fontSize: 14, fontWeight: 600, color: "var(--muted)" }}>/10</span></span>
+                    <span style={{ background: "linear-gradient(135deg,var(--m400),var(--m300))", color: "#fff", borderRadius: 12, padding: "6px 12px", fontSize: 12, fontWeight: 800, fontFamily: "'Poppins',sans-serif" }}>{ratingLabel}</span>
+                  </div>
+                )}
+              </div>
               <p style={{ color: "var(--muted)", fontSize: 14, fontWeight: 500 }}>1 = Very poor &nbsp;·&nbsp; 5 = Average &nbsp;·&nbsp; 10 = Excellent</p>
             </div>
 
@@ -1395,14 +1444,6 @@ function RatingPage({ user, onDone }) {
                 <button type="button" key={n} className={`rb${rating === n ? " on" : ""}`} onClick={() => setRating(n)} style={{ fontSize: 16 }}>{n}</button>
               ))}
             </div>
-
-            {/* Rating badge with animation */}
-            {rating > 0 && (
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 12, background: "#ffffff", border: "2px solid var(--m200)", borderRadius: 16, padding: "14px 22px", marginBottom: 28, animation: "popIn 0.4s ease", boxShadow: "0 8px 22px rgba(53,153,113,0.08)" }}>
-                <span style={{ fontWeight: 900, color: "var(--m500)", fontSize: 32, fontFamily: "'Poppins',sans-serif" }}>{rating}<span style={{ fontSize: 16, fontWeight: 600, color: "var(--muted)" }}>/10</span></span>
-                <span style={{ background: "linear-gradient(135deg,var(--m400),var(--m300))", color: "#fff", borderRadius: 12, padding: "6px 14px", fontSize: 13, fontWeight: 800, fontFamily: "'Poppins',sans-serif" }}>{ratingLabel}</span>
-              </div>
-            )}
 
             {submitErr && <p className="err-box" style={{ marginBottom: 16 }}>{submitErr}</p>}
 
