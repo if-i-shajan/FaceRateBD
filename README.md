@@ -218,5 +218,5 @@ Recommended improvements:
 
 ## Links
 
-- Live app: `https://facerate-bd.web.app`
-- GitHub: `https://github.com/if-i-shajan/FaceRateBD.git`
+- Live website: `https://facerate-bd.web.app`
+
