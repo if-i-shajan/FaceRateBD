@@ -168,59 +168,32 @@ Current admin password in code: `adminbaby`
 | Admin can add/delete photos | Admin tools |
 | Admin can export CSV | Analytics/export tab |
 
-## Feature Checklist
+## Features
 
-- [x] User sign-up and login
-- [x] Student ID format validation
-- [x] Separate admin access
-- [x] Random unrated queue
-- [x] Rating scale 1-10
-- [x] Duplicate rating protection
-- [x] Session resume and progress recovery
-- [x] Cooldown after 20 ratings
-- [x] User dashboard and history
-- [x] Admin upload/delete photos
-- [x] Admin analytics and CSV export
-- [x] Firebase deployment
-- [x] User profile photo upload with preview
-- [x] Profile photo display with gender emoji fallback (👨/👩)
-- [x] Admin panel user detail view with photo upload
-- [x] Admin panel Users table sorting (by name, student ID, avg rating, total rated)
-- [x] Admin panel Add Photos tab with UI improvements
-- [x] Professional button styling with hover effects
+**User Features:**
+- Secure account creation with student ID validation (format: 232-15-001)
+- Profile photo upload and display with circular avatars
+- Rate celebrity photos on a 1-10 scale
+- View rating history and personal statistics
+- Resumable sessions with progress tracking
+- Cooldown mechanism after every 20 ratings
 
-## New Features (Recent Updates)
+**Admin Features:**
+- Dedicated admin dashboard with role-based access
+- Add, manage, and delete celebrity photos
+- View user details, statistics, and ratings history
+- Sort users by multiple criteria (name, ID, average rating, total rated)
+- Upload profile photos for users directly from admin panel
+- Analytics and insights on ratings and user activity
+- CSV export functionality for data analysis
 
-### User Profile Photos
-- Users can upload profile photos from their dashboard
-- Photos are stored as Data URLs in the database
-- Circular avatar display with 5MB file size limit
-- Gender-based emoji fallback (👨 for male, 👩 for female) when no photo is available
-
-### Admin Panel Enhancements
-1. **User Detail View with Photo Upload**
-   - View detailed user statistics and ratings
-   - Upload profile photos directly from admin panel
-   - Display circular avatars with fallback emoji
-   - See all photos rated by the user with ratings
-
-2. **Users Table Sorting**
-   - Sort users by Student ID, Name, Average Rating, or Total Rated
-   - Toggle between ascending and descending order
-   - Dropdown controls for easy navigation
-
-3. **Improved Admin Panel Tabs**
-   - ➕ Add Photos (new tab on left)
-   - 📸 All Photos
-   - 👥 Users
-   - 📊 Analytics
-   - 💾 Export Data
-
-4. **UI Improvements**
-   - Professional gradient buttons with hover effects
-   - Smooth animations and transitions
-   - Better spacing and visual hierarchy
-   - Enhanced user experience with better feedback
+**Technical Features:**
+- Random unrated photo queue with shuffle algorithm
+- Session resume and progress recovery
+- Duplicate rating protection (one rating per user per photo)
+- Real-time data synchronization
+- Responsive design and professional UI with smooth animations
+- Firebase hosting for reliability and scalability
 
 ## Security Notes
 
