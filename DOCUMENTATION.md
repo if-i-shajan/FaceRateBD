@@ -315,23 +315,7 @@ GitHub: https://github.com/if-i-shajan/FaceRateBD.git
 
 ---
 
-## 14. Troubleshooting
-
-### Issue: "Cannot find table 'users'"
-**Solution**: Run `RatingApp/supabase/rls_policies.sql` to create tables
-
-### Issue: "Incorrect password"
-**Solution**: Check password includes uppercase, lowercase, and is 6+ characters
-
-### Issue: "Photo upload failed"
-**Solution**: Ensure file is under 5MB and is a valid image format (JPG, PNG, GIF, WebP)
-
-### Issue: "Session not resuming"
-**Solution**: Clear browser cache and sessionStorage, then login again
-
----
-
-## 15. Contact & Support
+## 14. Contact & Support
 
 - **Repository**: https://github.com/if-i-shajan/FaceRateBD.git
 - **Live App**: https://facerate-bd.web.app
@@ -339,7 +323,7 @@ GitHub: https://github.com/if-i-shajan/FaceRateBD.git
 
 ---
 
-## 16. License & Terms
+## 15. License & Terms
 
 This application is for educational and research purposes only. All user data is handled according to privacy policies. Users must maintain confidentiality of their account credentials.
 
