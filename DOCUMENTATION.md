@@ -335,7 +335,6 @@ GitHub: https://github.com/if-i-shajan/FaceRateBD.git
 
 - **Repository**: https://github.com/if-i-shajan/FaceRateBD.git
 - **Live App**: https://facerate-bd.web.app
-- **Issues**: Create GitHub issues for bugs or feature requests
 
 ---
 
@@ -345,6 +344,6 @@ This application is for educational and research purposes only. All user data is
 
 ---
 
+
 **Last Updated**: April 17, 2026  
-**Version**: 2.0 (with password encryption)  
-**Status**: Production Ready ✅
+
