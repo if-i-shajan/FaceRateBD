@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, memo } from "react";
 import { supabase } from "./supabaseClient";
+import bcrypt from "bcryptjs";
 
 function humanizeSupabaseError(err) {
   if (!err?.message) return "Could not save rating.";
@@ -257,24 +258,35 @@ function SignupPage({ onBack, onSignupSuccess }) {
 
     setLoading(true);
 
-    // Create new user
-    const newUser = {
-      id: studentId,
-      name,
-      email,
-      gender,
-      password: pw,
-      created_at: new Date().toISOString()
-    };
+    try {
+      // Hash password before saving
+      const hashedPassword = await bcrypt.hash(pw, 10);
 
-    const success = await DB.upsertUser(newUser);
+      // Create new user with hashed password
+      const newUser = {
+        id: studentId,
+        name,
+        email,
+        gender,
+        password: hashedPassword,
+        created_at: new Date().toISOString()
+      };
 
-    if (success.ok) {
-      sessionStorage.setItem("user", JSON.stringify(newUser));
-      setLoading(false);
-      onSignupSuccess(newUser);
-    } else {
-      setErr(`Failed to create account: ${success.error?.message || "Please try again."}`);
+      const success = await DB.upsertUser(newUser);
+
+      if (success.ok) {
+        // Store user info in sessionStorage without password
+        const userForSession = { ...newUser };
+        delete userForSession.password;
+        sessionStorage.setItem("user", JSON.stringify(userForSession));
+        setLoading(false);
+        onSignupSuccess(userForSession);
+      } else {
+        setErr(`Failed to create account: ${success.error?.message || "Please try again."}`);
+        setLoading(false);
+      }
+    } catch (error) {
+      setErr(`Error during signup: ${error.message}`);
       setLoading(false);
     }
   };
@@ -583,14 +595,23 @@ export default function App() {
   const go = (p) => { setErr(""); setPage(p); };
 
   const doLogin = async (id, pw) => {
-    const user = await DB.getUser(id);
-    if (!user) return setErr("No account found with this ID.");
-    if (user.password !== pw) return setErr("Incorrect password.");
+    try {
+      const user = await DB.getUser(id);
+      if (!user) return setErr("No account found with this ID.");
 
-    // Save to session
-    sessionStorage.setItem("user", JSON.stringify(user));
-    setUser(user);
-    go("dashboard");
+      // Compare password with hashed password
+      const passwordMatch = await bcrypt.compare(pw, user.password);
+      if (!passwordMatch) return setErr("Incorrect password.");
+
+      // Save to session without password
+      const userForSession = { ...user };
+      delete userForSession.password;
+      sessionStorage.setItem("user", JSON.stringify(userForSession));
+      setUser(userForSession);
+      go("dashboard");
+    } catch (error) {
+      setErr(`Login error: ${error.message}`);
+    }
   };
 
   const doLogout = async () => {

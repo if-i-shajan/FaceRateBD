@@ -197,16 +197,24 @@ Current admin password in code: `adminbaby`
 
 ## Security Notes
 
-- Passwords are currently stored directly in `users` table.
-- Admin password is hardcoded (`adminbaby`).
-- Supabase client values are in frontend source.
+**Implemented Security Measures:**
+- ✅ Passwords are hashed using bcryptjs (salt rounds: 10) - Never stored in plain text
+- ✅ Passwords are NOT stored in browser sessionStorage - Only user profile data is cached
+- ✅ Password comparison uses secure bcrypt.compare() method
+
+**Remaining Security Considerations:**
+- Admin password is hardcoded (`adminbaby`) - should use role-based auth
+- Supabase client values are in frontend source - consider using environment variables
+- RLS (Row Level Security) policies should be reviewed and tightened
+- Consider adding rate limiting on login attempts
 
 Recommended improvements:
 
-1. Hash passwords.
-2. Replace hardcoded admin secret with role-based auth.
-3. Tighten RLS policies.
-4. Move sensitive config to environment variables.
+1. ✅ Hash passwords - IMPLEMENTED with bcryptjs
+2. Replace hardcoded admin secret with role-based auth
+3. Tighten RLS policies
+4. Move sensitive config to environment variables
+5. Add rate limiting on authentication endpoints
 
 ## Links
 
